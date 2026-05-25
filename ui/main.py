@@ -254,7 +254,7 @@ class RondaApp:
         # Opponents
         return f"Side (Opponent {index+1})"
 
-    def on_multiplayer_message(self, message):
+    def on_multiplayer_message(self, topic, message):
         msg = json.loads(message)
         room = active_rooms.get(self.room_id)
         if not room: return
