@@ -3,7 +3,13 @@ from engine.spanish_deck import SpanishDeck
 from typing import List, Optional
 
 class RondaGameState(GameState):
-    def __init__(self, players: List[Player]):
+    def __init__(self, players: List[Player],
+                 target_score: int = 41,
+                 oros_scoring: bool = False,
+                 ace_of_gold_bonus: bool = False,
+                 allow_missa: bool = True,
+                 missa_last_card_allowed: bool = False,
+                 last_capture_wins_table: bool = True):
         super().__init__()
         self.deck = SpanishDeck(include_8_9=False)
         self.players = players
@@ -15,7 +21,13 @@ class RondaGameState(GameState):
         self.announcements = {}
         self.announcement_ranks = {}
         self.dealer_index = 0
-        self.target_score = 41
+        self.target_score = target_score
+        self.oros_scoring = oros_scoring
+        self.ace_of_gold_bonus = ace_of_gold_bonus
+        self.allow_missa = allow_missa
+        self.missa_last_card_allowed = missa_last_card_allowed
+        self.last_capture_wins_table = last_capture_wins_table
+
         self.game_over = False
         self._assign_teams()
         
@@ -144,9 +156,9 @@ class RondaGameState(GameState):
             self.last_taker = player
             events["captured"] = captured
             
-            if not self.table:
+            if not self.table and self.allow_missa:
                 is_last_card = all(len(p.hand) == 0 for p in self.players) and len(self.deck) == 0
-                if not is_last_card:
+                if not is_last_card or self.missa_last_card_allowed:
                     self.add_score(player, 1)
                     events["missa"] = True
         else:
@@ -163,23 +175,68 @@ class RondaGameState(GameState):
                 self.end_round()
         return events
 
+    def _add_team_score(self, team_id, points):
+        for p in self.players:
+            if p.team_id == team_id:
+                p.score += points
+
+    def serialize_state(self):
+        return {
+            "table": [{"suit": c.suit.value, "rank": c.rank} for c in self.table],
+            "players": [
+                {
+                    "name": p.name,
+                    "hand_size": len(p.hand),
+                    "score": p.score,
+                    "captured_count": len(p.captured_cards),
+                    "team_id": p.team_id,
+                    "hand": [{"suit": c.suit.value, "rank": c.rank} for c in p.hand] if p.is_human else []
+                } for p in self.players
+            ],
+            "current_player_index": self.current_player_index,
+            "dealer_index": self.dealer_index,
+            "game_over": self.game_over,
+            "deck_count": len(self.deck)
+        }
+
     def end_round(self):
-        if self.table and self.last_taker:
+        if self.table and self.last_taker and self.last_capture_wins_table:
             self.last_taker.capture(self.table)
             self.table = []
 
         team_captures = {}
+        team_oros_points = {}
+        team_ace_of_gold = {}
+
         for player in self.players:
             tid = player.team_id
             team_captures[tid] = team_captures.get(tid, 0) + len(player.captured_cards)
+
+            if self.oros_scoring or self.ace_of_gold_bonus:
+                for card in player.captured_cards:
+                    if card.suit == Suit.COINS:
+                        if self.oros_scoring:
+                            team_oros_points[tid] = team_oros_points.get(tid, 0) + card.rank
+                        if self.ace_of_gold_bonus and card.rank == 1:
+                            team_ace_of_gold[tid] = True
+
             player.captured_cards = []
 
-        for tid, count in team_captures.items():
+        unique_tids = set(p.team_id for p in self.players)
+        for tid in unique_tids:
+            count = team_captures.get(tid, 0)
+            # Standard scoring for captured cards > 20
             if count > 20:
                 points = count - 20
-                for p in self.players:
-                    if p.team_id == tid:
-                        p.score += points
+                self._add_team_score(tid, points)
+
+            # Oros scoring
+            if self.oros_scoring and tid in team_oros_points:
+                self._add_team_score(tid, team_oros_points[tid])
+
+            # Ace of Gold bonus
+            if self.ace_of_gold_bonus and team_ace_of_gold.get(tid):
+                self._add_team_score(tid, 10)
 
         winner = [p for p in self.players if p.score >= self.target_score]
         if winner:
