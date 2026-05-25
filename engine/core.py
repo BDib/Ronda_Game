@@ -43,6 +43,7 @@ class Player:
         self.hand: List[Card] = []
         self.captured_cards: List[Card] = []
         self.score = 0
+        self.team_id: Optional[int] = None
 
     def add_to_hand(self, cards: List[Card]):
         self.hand.extend(cards)

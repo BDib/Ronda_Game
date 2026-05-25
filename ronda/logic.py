@@ -17,6 +17,7 @@ class RondaGameState(GameState):
         self.dealer_index = 0
         self.target_score = 41
         self.game_over = False
+        self._assign_teams()
         
         self.initial_table_setup()
         self.deal_cards()
@@ -42,6 +43,25 @@ class RondaGameState(GameState):
             self.resolve_announcements()
         else:
             self.end_round()
+
+    def _assign_teams(self):
+        if len(self.players) == 4:
+            # Team 0: Players 0 and 1 (Opposite), Team 1: Players 2 and 3 (Opposite)
+            # Players: 0 (Top), 1 (Bottom/Human), 2 (Left), 3 (Right)
+            self.players[0].team_id = 0
+            self.players[1].team_id = 0
+            self.players[2].team_id = 1
+            self.players[3].team_id = 1
+        else:
+            # Each player is their own team
+            for i, p in enumerate(self.players):
+                p.team_id = i
+
+    def add_score(self, player: Player, points: int):
+        target_team = player.team_id
+        for p in self.players:
+            if p.team_id == target_team:
+                p.score += points
 
     def resolve_announcements(self):
         self.announcements = {}
@@ -70,7 +90,7 @@ class RondaGameState(GameState):
                 base = 100 if self.announcements[p] == "Tringla" else 0
                 return base + self.announcement_ranks[p]
             winner = max(announcers, key=sort_key)
-            winner.score += total_points
+            self.add_score(winner, total_points)
 
     def play_move(self, player: Player, card: Card) -> dict:
         if player != self.current_player:
@@ -81,13 +101,13 @@ class RondaGameState(GameState):
         if self.last_card_played and self.last_card_played.rank == card.rank:
             self.match_chain_count += 1
             if self.match_chain_count == 1:
-                player.score += 1
+                self.add_score(player, 1)
                 events["bount"] = True
             elif self.match_chain_count == 2:
-                player.score += 5
+                self.add_score(player, 5)
                 events["inza"] = True
             elif self.match_chain_count >= 3:
-                player.score += 10
+                self.add_score(player, 10)
                 events["ghader"] = True
         else:
             self.match_chain_count = 0
@@ -127,7 +147,7 @@ class RondaGameState(GameState):
             if not self.table:
                 is_last_card = all(len(p.hand) == 0 for p in self.players) and len(self.deck) == 0
                 if not is_last_card:
-                    player.score += 1
+                    self.add_score(player, 1)
                     events["missa"] = True
         else:
             self.table.append(card)
@@ -147,10 +167,20 @@ class RondaGameState(GameState):
         if self.table and self.last_taker:
             self.last_taker.capture(self.table)
             self.table = []
+
+        team_captures = {}
         for player in self.players:
-            num_cards = len(player.captured_cards)
-            if num_cards > 20: player.score += (num_cards - 20)
-            player.captured_cards = [] 
+            tid = player.team_id
+            team_captures[tid] = team_captures.get(tid, 0) + len(player.captured_cards)
+            player.captured_cards = []
+
+        for tid, count in team_captures.items():
+            if count > 20:
+                points = count - 20
+                for p in self.players:
+                    if p.team_id == tid:
+                        p.score += points
+
         winner = [p for p in self.players if p.score >= self.target_score]
         if winner:
             self.game_over = True

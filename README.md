@@ -4,46 +4,77 @@ A digital implementation of the traditional Moroccan card game **Ronda**, built 
 
 ## Overview
 
-Ronda is a popular trick-taking card game from Morocco, played with a 40-card Spanish deck. This project brings the game to your desktop with a single-player mode against a challenging AI.
+Ronda is a popular card game from Morocco, played with a 40-card Spanish deck. This project features both 1v1 and 2v2 team-based modes with an adaptable AI.
 
 ## Features
 
-- **Classic Rules**: Accurate implementation of Ronda rules, including matches and announcements.
-- **AI Opponent**: Play against a CPU with strategic move selection.
-- **Visual Feedback**: Real-time updates for game events like Bount, Inza, and Missa.
-- **Cross-Platform UI**: Modern interface powered by Flet.
+- **Multi-Player Support**: Play 1v1 or 2v2 with AI teammates and opponents.
+- **Dynamic AI Difficulty**: Choose between Easy, Medium, and Hard strategies.
+- **Team-Based Scoring**: In 4-player mode, scores and captured cards are pooled for teams.
+- **Modular Game Engine**: Designed to be extensible for other Spanish-deck games like Brisca, Mus, or Escoba.
+- **Community Inspired**: Refined with UX insights from popular Ronda community projects.
 
-## How to Play
+---
 
-### Setup
-- The game uses a 40-card Spanish deck (ranks 1-7 and 10-12).
-- Each player is dealt 3 cards per hand.
-- 4 cards are placed on the table at the start of each round.
+## 📖 How to Play Ronda
 
-### Objective
-Capture as many cards as possible by matching ranks on the table. Capturing sequences of cards is also possible (e.g., matching a 3 on the table allows you to also capture a 4, 5, etc., if they are present in sequence).
+### The Deck
+Ronda uses the 40-card **Spanish deck** (Baraja Española). It has 4 suits (Coins, Cups, Swords, Clubs) with ranks 1–7 and 10–12. Ranks 8 and 9 are not used.
 
-### Scoring
-- **Bount (Match)**: Matching a card played by the previous player (1 point).
-- **Inza (Triple Match)**: Matching a card that was already matched once (5 points).
-- **Ghader (Quad Match)**: Matching a card for the fourth time (10 points).
-- **Missa**: Clearing the entire table (1 point).
-- **Announcements**:
-  - **Ronda**: Two cards of the same rank (1 point).
-  - **Tringla**: Three cards of the same rank (5 points).
-- **End of Round**: Players receive 1 point for every card captured beyond 20.
+### The Objective
+The goal is to score **41 points** first. Points are earned during the round through announcements and special matches, and at the end of the round by counting captured cards.
 
-## Installation and Usage
+### Dealing & Start
+1.  **Initial Table**: 4 cards are placed face-up on the table (no pairs allowed initially).
+2.  **Hand**: Each player is dealt **3 cards**. Once everyone plays their 3 cards, another 3 are dealt until the deck is empty.
+3.  **Teams**: In 4-player mode, you and the player opposite you form a team.
 
-See [BUILD.md](BUILD.md) for detailed instructions on setting up the environment and running the game.
+### Gameplay Tutorial
+1.  **Matching**: On your turn, play one card. If its rank matches any card on the table, you **capture** both.
+2.  **Sequences**: If you make a match, you also capture any cards on the table that follow the matched rank in numerical order (e.g., matching a 5 also takes the 6 and 7 if they are on the table).
+3.  **Discarding**: If your card doesn't match anything, it stays on the table for others to capture.
+4.  **Missa**: If you capture all cards from the table, you score 1 point.
 
-## Testing
+### Special Scoring Events
+*   **Bount (+1 pt)**: Match the card that the player *immediately before you* just played.
+*   **Inza (+5 pts)**: If you match a card that was just used for a Bount (i.e., three of the same rank played in a row).
+*   **Ghader (+10 pts)**: If all four cards of the same rank are played consecutively.
 
-Run tests located in the `tests/` directory to verify game logic:
-```bash
-python3 -m unittest discover tests
-```
+### Announcements (At Deal)
+When you receive your 3 cards, the game checks for:
+*   **Ronda (+1 pt)**: A pair in your hand.
+*   **Tringla (+5 pts)**: Three-of-a-kind in your hand.
+*   *Note: Only the player/team with the highest-ranking announcement scores the total points of all announcements made in that deal.*
+
+### End of Round
+Once the deck is empty and all cards are played:
+1.  The last person to make a capture takes any remaining cards on the table.
+2.  Count your captured cards. Every card **beyond 20** scores 1 point (e.g., 25 cards = 5 points).
+3.  In teams, combine your cards (Team total > 20).
+
+---
+
+## 🏗️ Technical Architecture
+
+This project is built on a modular engine (`engine/core.py`) that can be adapted for other Mediterranean card games:
+*   **Brisca / Briscola**: Update `logic.py` for trick-taking and trump suit logic.
+*   **Mus**: Add betting phases and specific hand-ranking logic.
+*   **Escoba**: Modify capture logic to sum to 15.
+*   **Tute / Chinchón**: Implement melding and specific scoring declarations.
+
+The UI is built with **Flet (Flutter for Python)**, providing a responsive and hardware-accelerated experience.
+
+---
+
+## 🚀 Getting Started
+
+See [BUILD.md](BUILD.md) for installation and running instructions.
+
+## 🤝 Acknowledgments
+Inspired by the work of the Moroccan developer community, specifically:
+*   [ozennou/Ronda-dev](https://github.com/ozennou/Ronda-dev)
+*   [Dahercode/ronda](https://github.com/Dahercode/ronda)
+*   [Callmevbdu/Ronda-moroccan_game](https://github.com/Callmevbdu/Ronda-moroccan_game)
 
 ## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE) for details.
