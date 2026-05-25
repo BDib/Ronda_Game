@@ -3,10 +3,11 @@ from engine.spanish_deck import SpanishDeck
 from typing import List, Optional
 
 class RondaGameState(GameState):
-    def __init__(self, player_names: List[str]):
+    def __init__(self, players: List[Player]):
         super().__init__()
         self.deck = SpanishDeck(include_8_9=False)
-        self.players = [Player(name) for name in player_names]
+        self.players = players
+        self.current_player_index = 1 # Dealer is 0, so player 1 starts
         self.last_taker: Optional[Player] = None
         self.last_card_played: Optional[Card] = None
         self.match_chain_count: int = 0
@@ -27,23 +28,12 @@ class RondaGameState(GameState):
             if not self.deck.cards: break
             card = self.deck.draw(1)[0]
             ranks = [c.rank for c in self.table]
-            if card.rank in ranks or self._is_sequence_with(card.rank, ranks):
+            if card.rank in ranks:
+                # In Ronda, only pairs are forbidden on the initial table
                 self.deck.cards.append(card)
                 self.deck.shuffle()
             else:
                 self.table.append(card)
-
-    def _is_sequence_with(self, rank: int, ranks: List[int]) -> bool:
-        full_ranks = [1, 2, 3, 4, 5, 6, 7, 10, 11, 12]
-        try:
-            idx = full_ranks.index(rank)
-        except ValueError: return False
-        for r in ranks:
-            try:
-                r_idx = full_ranks.index(r)
-                if abs(idx - r_idx) == 1: return True
-            except ValueError: continue
-        return False
 
     def deal_cards(self):
         if len(self.deck) >= len(self.players) * 3:
@@ -83,8 +73,10 @@ class RondaGameState(GameState):
             winner.score += total_points
 
     def play_move(self, player: Player, card: Card) -> dict:
+        if player != self.current_player:
+            return {}
         player.play_card(card)
-        events = {"captured": [], "bount": False, "inza": False, "ghader": False, "missa": False}
+        events = {"captured": [], "bount": False, "inza": False, "ghader": False, "missa": False, "announcements": {}}
         
         if self.last_card_played and self.last_card_played.rank == card.rank:
             self.match_chain_count += 1
@@ -141,10 +133,14 @@ class RondaGameState(GameState):
             self.table.append(card)
             
         self.last_card_played = card
+        self.next_turn()
+
         if all(len(p.hand) == 0 for p in self.players):
-            if len(self.deck) > 0: self.deal_cards()
-            else: self.end_round()
-        else: self.next_turn()
+            if len(self.deck) > 0:
+                self.deal_cards()
+                events["announcements"] = self.announcements
+            else:
+                self.end_round()
         return events
 
     def end_round(self):
@@ -161,9 +157,14 @@ class RondaGameState(GameState):
             self.is_over = True
         else:
             self.dealer_index = (self.dealer_index + 1) % len(self.players)
+            self.current_player_index = (self.dealer_index + 1) % len(self.players)
             self.deck = SpanishDeck(include_8_9=False)
             self.last_taker = None
             self.last_card_played = None
             self.match_chain_count = 0
+            self.table = []
+            for player in self.players:
+                player.hand = []
+                player.captured_cards = []
             self.initial_table_setup()
             self.deal_cards()
