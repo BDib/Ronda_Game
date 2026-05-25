@@ -164,4 +164,4 @@ def main(page: ft.Page):
     RondaApp(page)
 
 if __name__ == "__main__":
-    ft.app(target=main, assets_dir="assets")
+    ft.app(main, assets_dir="assets")
