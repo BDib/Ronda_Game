@@ -109,8 +109,8 @@ class RondaApp:
             ft.Text("Lobby AI Timer (minutes)"),
             lobby_timer_slider,
             ft.Row([
-                ft.ElevatedButton("Host 2-Player Room", on_click=lambda _: self.create_multiplayer_room(2, lobby_timer_slider.value, get_game_opts())),
-                ft.ElevatedButton("Host 4-Player Room", on_click=lambda _: self.create_multiplayer_room(4, lobby_timer_slider.value, get_game_opts())),
+                ft.FilledButton("Host 2-Player Room", on_click=lambda _: self.create_multiplayer_room(2, lobby_timer_slider.value, get_game_opts())),
+                ft.FilledButton("Host 4-Player Room", on_click=lambda _: self.create_multiplayer_room(4, lobby_timer_slider.value, get_game_opts())),
             ], alignment=ft.MainAxisAlignment.CENTER),
             ft.Divider(height=20, color="transparent"),
             ft.Text("Join Existing Game", size=18),
@@ -161,7 +161,7 @@ class RondaApp:
             "timer_seconds": int(timer_mins * 60),
             "start_time": asyncio.get_event_loop().time()
         }
-        self.page.pubsub.subscribe_topic(f"room_{self.room_id}", self.on_multiplayer_message)
+        self.page.pubsub.subscribe_on_topic(f"room_{self.room_id}", self.on_multiplayer_message)
         self.join_multiplayer_room(self.room_id, is_host=True)
         self.page.run_task(self.lobby_timer_task)
 
@@ -221,7 +221,7 @@ class RondaApp:
                 self.page.snack_bar.open = True
                 self.page.update()
                 return
-            self.page.pubsub.subscribe_topic(f"room_{self.room_id}", self.on_multiplayer_message)
+            self.page.pubsub.subscribe_on_topic(f"room_{self.room_id}", self.on_multiplayer_message)
         self.page.clean()
         controls = [
             ft.Text(f"ROOM: {self.room_id}", size=40, weight="bold"),
@@ -240,7 +240,7 @@ class RondaApp:
             )
         )
         self.page.update()
-        self.page.pubsub.send_all_topic(f"room_{self.room_id}", json.dumps({
+        self.page.pubsub.send_all_on_topic(f"room_{self.room_id}", json.dumps({
             "type": "JOIN", "index": self.my_player_index, "name": f"Player {self.my_player_index + 1}"
         }))
 
@@ -281,7 +281,7 @@ class RondaApp:
                 self.page.run_task(self.handle_cpu_move)
 
     def broadcast_state(self):
-        self.page.pubsub.send_all_topic(f"room_{self.room_id}", json.dumps({"type": "STATE"}))
+        self.page.pubsub.send_all_on_topic(f"room_{self.room_id}", json.dumps({"type": "STATE"}))
 
     def start_game(self, num_players, **opts):
         self.is_multiplayer = False
@@ -416,7 +416,7 @@ class RondaApp:
             ft.Container(
                 content=ft.Column([
                     ft.Row([
-                        ft.Column([ft.Text(f"Team {player_me.team_id + 1 if player_me.team_id is not None else ''} | {player_me.name}'s Score: {player_me.score}", size=18, weight="bold", color="white"), ft.Text("Dealer" if self.game.players[self.game.dealer_index] == player_me else "", size=12, color="yellow")], spacing=1),
+                        ft.Column([ft.Text(f"Team {player_me.team_id + 1 if player_me.team_id is not None else ''} | Your Score: {player_me.score}", size=18, weight="bold", color="white"), ft.Text("Dealer" if self.game.players[self.game.dealer_index] == player_me else "", size=12, color="yellow")], spacing=1),
                         ft.Text(f"Captured: {len(player_me.captured_cards)}", size=12, color="white70")
                     ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                     human_hand
@@ -435,7 +435,7 @@ class RondaApp:
             if self.is_multiplayer:
                 room = active_rooms[self.room_id]
                 room["last_events"] = events
-                self.page.pubsub.send_all_topic(f"room_{self.room_id}", json.dumps({"type": "UPDATE"}))
+                self.page.pubsub.send_all_on_topic(f"room_{self.room_id}", json.dumps({"type": "UPDATE"}))
             else:
                 self.render_game_board()
                 if not self.game.game_over:
@@ -459,6 +459,4 @@ def main(page: ft.Page):
 if __name__ == "__main__":
     base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     assets_path = os.path.join(base_path, "assets")
-    # Using ft.app for now as ft.run is for Flet CLI/Desktop primarily in some versions,
-    # but the log suggested ft.app is deprecated. However, we need to ensure assets_dir is passed.
     ft.app(target=main, assets_dir=assets_path, view=ft.AppView.WEB_BROWSER)
