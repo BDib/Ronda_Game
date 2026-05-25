@@ -334,11 +334,22 @@ class RondaApp:
             is_turn = self.game.current_player == player
             status_color = "yellow" if is_turn else "white"
             dealer_mark = " (D)" if is_dealer else ""
+
+            # Calculate stats for the player's team
+            tid = str(player.team_id)
+            serialized = self.game.serialize_state()
+            stats = serialized["team_stats"].get(tid, {"oros_count": 0, "oros_sum": 0, "ace_of_gold": False, "captured_count": 0})
+
+            oros_text = f"Gold: {stats['oros_count']}"
+            if self.game.oros_scoring:
+                oros_text += f" ({stats['oros_sum']} pts)"
+            ace_mark = " ★" if stats['ace_of_gold'] else ""
+
             content_list = [
                 ft.Column([
                     ft.Text(f"{player.name}{dealer_mark}", size=14, weight="bold", color=status_color),
                     ft.Text(f"Score: {player.score}", size=12, color="white70"),
-                    ft.Text(f"Captured: {len(player.captured_cards)}", size=11, color="white54"),
+                    ft.Text(f"Captured: {len(player.captured_cards)} | {oros_text}{ace_mark}", size=11, color="white54"),
                 ], spacing=1),
             ]
             hand_images = [ft.Image(src="/cards/card_back.jpeg", width=40 if orientation=="vertical" else 50, border_radius=3) for _ in player.hand]
@@ -420,14 +431,30 @@ class RondaApp:
             ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
             expand=True, alignment=ft.Alignment(0, 0), padding=15, bgcolor="#263238", border_radius=20, margin=ft.Margin(10, 10, 10, 10),
         )
+        # Stats for my team
+        my_tid = str(player_me.team_id)
+        serialized = self.game.serialize_state()
+        my_stats = serialized["team_stats"].get(my_tid, {"oros_count": 0, "oros_sum": 0, "ace_of_gold": False, "captured_count": 0})
+
+        my_oros_text = f"Gold: {my_stats['oros_count']}"
+        if self.game.oros_scoring:
+            my_oros_text += f" (Sum: {my_stats['oros_sum']})"
+        my_ace_mark = " ★ (Ace of Gold Captured!)" if my_stats['ace_of_gold'] else ""
+
         main_layout = ft.Column([
             player_panel(top_player),
             ft.Row([player_panel(left_player, "vertical") if left_player else ft.Container(width=100), central_area, player_panel(right_player, "vertical") if right_player else ft.Container(width=100)], expand=True),
             ft.Container(
                 content=ft.Column([
                     ft.Row([
-                        ft.Column([ft.Text(f"Team {player_me.team_id + 1 if player_me.team_id is not None else ''} | Your Score: {player_me.score}", size=18, weight="bold", color="white"), ft.Text("Dealer" if self.game.players[self.game.dealer_index] == player_me else "", size=12, color="yellow")], spacing=1),
-                        ft.Text(f"Captured: {len(player_me.captured_cards)}", size=12, color="white70")
+                        ft.Column([
+                            ft.Text(f"Team {player_me.team_id + 1 if player_me.team_id is not None else ''} | Your Score: {player_me.score}", size=18, weight="bold", color="white"),
+                            ft.Text("Dealer" if self.game.players[self.game.dealer_index] == player_me else "", size=12, color="yellow")
+                        ], spacing=1),
+                        ft.Column([
+                            ft.Text(f"Captured: {len(player_me.captured_cards)} | {my_oros_text}", size=12, color="white70"),
+                            ft.Text(my_ace_mark, size=12, color="yellow", weight="bold") if my_stats['ace_of_gold'] else ft.Container()
+                        ], horizontal_alignment=ft.CrossAxisAlignment.END)
                     ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                     human_hand
                 ]),
@@ -472,7 +499,6 @@ def main(page: ft.Page):
     RondaApp(page)
 
 if __name__ == "__main__":
-    # Use absolute path for assets to ensure compatibility across execution modes
-    base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    assets_path = os.path.join(base_path, "assets")
+    # Assets are now located in ui/assets/
+    assets_path = os.path.join(os.path.dirname(__file__), "assets")
     ft.app(target=main, assets_dir=assets_path)

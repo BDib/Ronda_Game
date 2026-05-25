@@ -181,6 +181,19 @@ class RondaGameState(GameState):
                 p.score += points
 
     def serialize_state(self):
+        team_stats = {}
+        for p in self.players:
+            tid = str(p.team_id)
+            if tid not in team_stats:
+                team_stats[tid] = {"oros_count": 0, "oros_sum": 0, "ace_of_gold": False, "captured_count": 0}
+            team_stats[tid]["captured_count"] += len(p.captured_cards)
+            for c in p.captured_cards:
+                if c.suit == Suit.COINS:
+                    team_stats[tid]["oros_count"] += 1
+                    team_stats[tid]["oros_sum"] += c.rank
+                    if c.rank == 1:
+                        team_stats[tid]["ace_of_gold"] = True
+
         return {
             "table": [{"suit": c.suit.value, "rank": c.rank} for c in self.table],
             "players": [
@@ -196,7 +209,8 @@ class RondaGameState(GameState):
             "current_player_index": self.current_player_index,
             "dealer_index": self.dealer_index,
             "game_over": self.game_over,
-            "deck_count": len(self.deck)
+            "deck_count": len(self.deck),
+            "team_stats": team_stats
         }
 
     def end_round(self):
