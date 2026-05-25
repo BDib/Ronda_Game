@@ -161,7 +161,7 @@ class RondaApp:
             "timer_seconds": int(timer_mins * 60),
             "start_time": asyncio.get_event_loop().time()
         }
-        self.page.pubsub.subscribe_on_topic(f"room_{self.room_id}", self.on_multiplayer_message)
+        self.page.pubsub.subscribe_topic(f"room_{self.room_id}", self.on_multiplayer_message)
         self.join_multiplayer_room(self.room_id, is_host=True)
         self.page.run_task(self.lobby_timer_task)
 
@@ -221,7 +221,7 @@ class RondaApp:
                 self.page.snack_bar.open = True
                 self.page.update()
                 return
-            self.page.pubsub.subscribe_on_topic(f"room_{self.room_id}", self.on_multiplayer_message)
+            self.page.pubsub.subscribe_topic(f"room_{self.room_id}", self.on_multiplayer_message)
         self.page.clean()
         controls = [
             ft.Text(f"ROOM: {self.room_id}", size=40, weight="bold"),
@@ -245,11 +245,14 @@ class RondaApp:
         }))
 
     def get_pos_name(self, index):
-        if index == 0: return "Top (Partner)"
-        if index == 1: return "Bottom (You)"
-        if index == 2: return "Left (Opponent)"
-        if index == 3: return "Right (Opponent)"
-        return "Spectator"
+        if index == self.my_player_index: return "Bottom (You)"
+        # Assuming team mode (4 players)
+        # 0 & 1 are partners, 2 & 3 are partners
+        my_team = 0 if self.my_player_index in [0, 1] else 1
+        partner_index = 1 if self.my_player_index == 0 else 0 if self.my_player_index == 1 else 3 if self.my_player_index == 2 else 2
+        if index == partner_index: return "Top (Partner)"
+        # Opponents
+        return f"Side (Opponent {index+1})"
 
     def on_multiplayer_message(self, message):
         msg = json.loads(message)
@@ -356,8 +359,15 @@ class RondaApp:
 
         player_me = self.game.players[self.my_player_index]
         if len(self.game.players) == 4:
-            partner_idx = 0 if self.my_player_index == 1 else 1
-            left_idx, right_idx = 2, 3
+            # Partners sit opposite each other (0&1, 2&3)
+            if self.my_player_index == 0:
+                partner_idx, left_idx, right_idx = 1, 2, 3
+            elif self.my_player_index == 1:
+                partner_idx, left_idx, right_idx = 0, 2, 3
+            elif self.my_player_index == 2:
+                partner_idx, left_idx, right_idx = 3, 0, 1
+            else: # 3
+                partner_idx, left_idx, right_idx = 2, 0, 1
         else:
             partner_idx = 0 if self.my_player_index == 1 else 1
             left_idx, right_idx = None, None
@@ -449,14 +459,20 @@ class RondaApp:
         if not current_ai.is_human and not self.game.game_over:
             move = current_ai.select_move(self.game)
             self.last_events = self.game.play_move(current_ai, move)
-            self.render_game_board()
-            if not self.game.current_player.is_human and not self.game.game_over:
-                self.page.run_task(self.handle_cpu_move)
+            if self.is_multiplayer:
+                room = active_rooms[self.room_id]
+                room["last_events"] = self.last_events
+                self.page.pubsub.send_all_on_topic(f"room_{self.room_id}", json.dumps({"type": "UPDATE"}))
+            else:
+                self.render_game_board()
+                if not self.game.current_player.is_human and not self.game.game_over:
+                    self.page.run_task(self.handle_cpu_move)
 
 def main(page: ft.Page):
     RondaApp(page)
 
 if __name__ == "__main__":
+    # Use absolute path for assets to ensure compatibility across execution modes
     base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     assets_path = os.path.join(base_path, "assets")
-    ft.app(target=main, assets_dir=assets_path, view=ft.AppView.WEB_BROWSER)
+    ft.app(target=main, assets_dir=assets_path)
