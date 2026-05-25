@@ -80,8 +80,20 @@ class RondaApp:
                 ft.Text(f"CPU: {self.ai_player.score} pts", size=18, weight="bold", color="white"),
                 ft.Text("Dealer" if self.game.players[self.game.dealer_index] == self.ai_player else "", size=12, color="yellow"),
             ]),
-            ft.Row([ft.Image(src="cards/card_back.jpeg", width=60) for _ in self.ai_player.hand])
+            ft.Row([
+                ft.Text(f"Captured: {len(self.ai_player.captured_cards)}", size=12, color="white70"),
+                ft.Row([ft.Image(src="cards/card_back.jpeg", width=60) for _ in self.ai_player.hand])
+            ])
         ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+
+        deck_stack = ft.Stack([
+            ft.Image(src="cards/card_back.jpeg", width=70, opacity=0.8),
+            ft.Container(
+                content=ft.Text(str(len(self.game.deck)), size=14, weight="bold", color="white"),
+                alignment=ft.Alignment(0, 0),
+                width=70, height=100
+            )
+        ]) if len(self.game.deck) > 0 else ft.Container()
 
         table_row = ft.Row(
             controls=[ft.Image(src=self.get_card_image_path(c), width=90) for c in self.game.table],
@@ -123,20 +135,24 @@ class RondaApp:
                 ft.Container(
                     content=ft.Column([
                         ft.Text(" ".join(event_text), color="yellow", size=24, weight="bold"),
-                        table_row,
+                        ft.Row([deck_stack, table_row], alignment=ft.MainAxisAlignment.CENTER, spacing=30),
                         ft.Text(status_text, color="white", size=16, italic=True)
                     ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
                     expand=True, alignment=ft.Alignment(0, 0)
                 ),
                 ft.Column([
                     ft.Row([
-                        ft.Text(f"Your Score: {self.human_player.score}", size=20, weight="bold", color="white"),
+                        ft.Column([
+                            ft.Text(f"Your Score: {self.human_player.score}", size=20, weight="bold", color="white"),
+                            ft.Text(f"Captured: {len(self.human_player.captured_cards)} cards", size=12, color="white70"),
+                        ]),
                         ft.Text("Dealer" if self.game.players[self.game.dealer_index] == self.human_player else "", size=12, color="yellow"),
                     ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                     human_hand
                 ])
             ], expand=True, spacing=20)
         )
+        self.page.update()
 
     def handle_human_move(self, card: Card):
         if self.game.current_player == self.human_player and not self.game.game_over:
