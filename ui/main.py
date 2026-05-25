@@ -141,14 +141,14 @@ class RondaApp:
                 return ft.Container(
                     content=ft.Row(content_list, alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                     padding=10, bgcolor="#1b5e20" if not is_turn else "#2e7d32", border_radius=10,
-                    border=ft.border.all(2, "yellow") if is_turn else None
+                    border=ft.Border.all(2, "yellow") if is_turn else None
                 )
             else:
                 content_list.append(ft.Column(hand_images, spacing=5))
                 return ft.Container(
                     content=ft.Column(content_list, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
                     padding=10, bgcolor="#1b5e20" if not is_turn else "#2e7d32", border_radius=10,
-                    border=ft.border.all(2, "yellow") if is_turn else None
+                    border=ft.Border.all(2, "yellow") if is_turn else None
                 )
 
         top_player = self.game.players[0]
@@ -193,7 +193,7 @@ class RondaApp:
 
         def on_card_hover(e):
             e.control.scale = 1.1 if e.data == "true" else 1.0
-            e.control.border = ft.border.all(3, "yellow") if e.data == "true" else None
+            e.control.border = ft.Border.all(3, "yellow") if e.data == "true" else None
             e.control.update()
 
         human_hand = ft.Row(
@@ -253,7 +253,7 @@ class RondaApp:
                 ]),
                 padding=10, bgcolor="#1b5e20" if self.game.current_player != self.human_player else "#2e7d32",
                 border_radius=10,
-                border=ft.border.all(2, "yellow") if self.game.current_player == self.human_player else None
+                border=ft.Border.all(2, "yellow") if self.game.current_player == self.human_player else None
             )
         ], expand=True, spacing=5)
 
