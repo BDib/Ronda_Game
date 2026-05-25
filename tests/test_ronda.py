@@ -23,6 +23,10 @@ class TestRonda(unittest.TestCase):
         self.assertNotEqual(self.game.current_player, current)
 
     def test_bount_scoring(self):
+        # Reset scores to ensure we only measure this move
+        for p in self.game.players:
+            p.score = 0
+
         # Force last card played to match
         self.game.last_card_played = Card(Suit.COINS, 5)
         # current player plays a 5
