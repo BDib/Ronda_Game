@@ -3,10 +3,18 @@ from engine.spanish_deck import SpanishDeck
 from typing import List, Optional
 
 class RondaGameState(GameState):
-    def __init__(self, player_names: List[str]):
+    def __init__(self, players: List[Player],
+                 target_score: int = 41,
+                 oros_scoring: bool = False,
+                 ace_of_gold_bonus: bool = False,
+                 allow_missa: bool = True,
+                 missa_last_card_allowed: bool = False,
+                 last_capture_wins_table: bool = True,
+                 enable_9a3a: bool = True):
         super().__init__()
         self.deck = SpanishDeck(include_8_9=False)
-        self.players = [Player(name) for name in player_names]
+        self.players = players
+        self.current_player_index = (self.dealer_index + 1) % len(self.players) if hasattr(self, 'dealer_index') else 1
         self.last_taker: Optional[Player] = None
         self.last_card_played: Optional[Card] = None
         self.match_chain_count: int = 0
@@ -14,8 +22,16 @@ class RondaGameState(GameState):
         self.announcements = {}
         self.announcement_ranks = {}
         self.dealer_index = 0
-        self.target_score = 41
+        self.target_score = target_score
+        self.oros_scoring = oros_scoring
+        self.ace_of_gold_bonus = ace_of_gold_bonus
+        self.allow_missa = allow_missa
+        self.missa_last_card_allowed = missa_last_card_allowed
+        self.last_capture_wins_table = last_capture_wins_table
+        self.enable_9a3a = enable_9a3a
+
         self.game_over = False
+        self._assign_teams()
         
         self.initial_table_setup()
         self.deal_cards()
@@ -27,23 +43,12 @@ class RondaGameState(GameState):
             if not self.deck.cards: break
             card = self.deck.draw(1)[0]
             ranks = [c.rank for c in self.table]
-            if card.rank in ranks or self._is_sequence_with(card.rank, ranks):
+            if card.rank in ranks:
+                # In Ronda, only pairs are forbidden on the initial table
                 self.deck.cards.append(card)
                 self.deck.shuffle()
             else:
                 self.table.append(card)
-
-    def _is_sequence_with(self, rank: int, ranks: List[int]) -> bool:
-        full_ranks = [1, 2, 3, 4, 5, 6, 7, 10, 11, 12]
-        try:
-            idx = full_ranks.index(rank)
-        except ValueError: return False
-        for r in ranks:
-            try:
-                r_idx = full_ranks.index(r)
-                if abs(idx - r_idx) == 1: return True
-            except ValueError: continue
-        return False
 
     def deal_cards(self):
         if len(self.deck) >= len(self.players) * 3:
@@ -52,6 +57,28 @@ class RondaGameState(GameState):
             self.resolve_announcements()
         else:
             self.end_round()
+
+    def _assign_teams(self):
+        if len(self.players) == 4:
+            # Team 0: Players 0 and 1 (Opposite), Team 1: Players 2 and 3 (Opposite)
+            # Players: 0 (Top), 1 (Bottom/Human), 2 (Left), 3 (Right)
+            self.players[0].team_id = 0
+            self.players[1].team_id = 0
+            self.players[2].team_id = 1
+            self.players[3].team_id = 1
+        else:
+            # Each player is their own team
+            for i, p in enumerate(self.players):
+                p.team_id = i
+
+    def add_score(self, player: Player, points: int):
+        target_team = player.team_id
+        if target_team is None:
+            player.score += points
+            return
+        for p in self.players:
+            if p.team_id == target_team:
+                p.score += points
 
     def resolve_announcements(self):
         self.announcements = {}
@@ -80,22 +107,24 @@ class RondaGameState(GameState):
                 base = 100 if self.announcements[p] == "Tringla" else 0
                 return base + self.announcement_ranks[p]
             winner = max(announcers, key=sort_key)
-            winner.score += total_points
+            self.add_score(winner, total_points)
 
     def play_move(self, player: Player, card: Card) -> dict:
+        if player != self.current_player:
+            return {}
         player.play_card(card)
-        events = {"captured": [], "bount": False, "inza": False, "ghader": False, "missa": False}
+        events = {"captured": [], "bount": False, "inza": False, "ghader": False, "missa": False, "announcements": {}}
         
         if self.last_card_played and self.last_card_played.rank == card.rank:
             self.match_chain_count += 1
             if self.match_chain_count == 1:
-                player.score += 1
+                self.add_score(player, 1)
                 events["bount"] = True
             elif self.match_chain_count == 2:
-                player.score += 5
+                self.add_score(player, 5)
                 events["inza"] = True
             elif self.match_chain_count >= 3:
-                player.score += 10
+                self.add_score(player, 10)
                 events["ghader"] = True
         else:
             self.match_chain_count = 0
@@ -132,38 +161,135 @@ class RondaGameState(GameState):
             self.last_taker = player
             events["captured"] = captured
             
-            if not self.table:
+            if not self.table and self.allow_missa:
                 is_last_card = all(len(p.hand) == 0 for p in self.players) and len(self.deck) == 0
-                if not is_last_card:
-                    player.score += 1
+                if not is_last_card or self.missa_last_card_allowed:
+                    self.add_score(player, 1)
                     events["missa"] = True
         else:
             self.table.append(card)
             
         self.last_card_played = card
+        self.next_turn()
+
         if all(len(p.hand) == 0 for p in self.players):
-            if len(self.deck) > 0: self.deal_cards()
-            else: self.end_round()
-        else: self.next_turn()
+            if len(self.deck) > 0:
+                self.deal_cards()
+                events["announcements"] = self.announcements
+            else:
+                self.end_round()
         return events
 
+    def _add_team_score(self, team_id, points):
+        for p in self.players:
+            if p.team_id == team_id:
+                p.score += points
+
+    def serialize_state(self):
+        team_stats = {}
+        for p in self.players:
+            tid = str(p.team_id)
+            if tid not in team_stats:
+                team_stats[tid] = {"oros_count": 0, "oros_sum": 0, "ace_of_gold": False, "captured_count": 0}
+            team_stats[tid]["captured_count"] += len(p.captured_cards)
+            for c in p.captured_cards:
+                if c.suit == Suit.COINS:
+                    team_stats[tid]["oros_count"] += 1
+                    team_stats[tid]["oros_sum"] += c.rank
+                    if c.rank == 1:
+                        team_stats[tid]["ace_of_gold"] = True
+
+        return {
+            "table": [{"suit": c.suit.value, "rank": c.rank} for c in self.table],
+            "players": [
+                {
+                    "name": p.name,
+                    "hand_size": len(p.hand),
+                    "score": p.score,
+                    "captured_count": len(p.captured_cards),
+                    "team_id": p.team_id,
+                    "hand": [{"suit": c.suit.value, "rank": c.rank} for c in p.hand] if p.is_human else []
+                } for p in self.players
+            ],
+            "current_player_index": self.current_player_index,
+            "dealer_index": self.dealer_index,
+            "game_over": self.game_over,
+            "deck_count": len(self.deck),
+            "team_stats": team_stats
+        }
+
     def end_round(self):
-        if self.table and self.last_taker:
+        # 9a3a Rules
+        if self.enable_9a3a and self.last_card_played:
+            dealer = self.players[self.dealer_index]
+            # 9a3a Rey: Dealer ends with 12
+            if self.last_card_played.rank == 12:
+                self.add_score(dealer, 5)
+            # 9a3a As: Dealer ends with 1 (Opponent wins points)
+            elif self.last_card_played.rank == 1:
+                # Give points to opponent team
+                unique_teams = list(set(p.team_id for p in self.players))
+                if len(unique_teams) == 2:
+                    opponent_tid = [t for t in unique_teams if t != dealer.team_id][0]
+                else:
+                    opponent_tid = (dealer.team_id + 1) % len(self.players)
+
+                for p in self.players:
+                    if p.team_id == opponent_tid:
+                        p.score += 5
+
+        if self.table and self.last_taker and self.last_capture_wins_table:
             self.last_taker.capture(self.table)
             self.table = []
+
+        team_captures = {}
+        team_oros_points = {}
+        team_ace_of_gold = {}
+
         for player in self.players:
-            num_cards = len(player.captured_cards)
-            if num_cards > 20: player.score += (num_cards - 20)
-            player.captured_cards = [] 
+            tid = player.team_id
+            team_captures[tid] = team_captures.get(tid, 0) + len(player.captured_cards)
+
+            if self.oros_scoring or self.ace_of_gold_bonus:
+                for card in player.captured_cards:
+                    if card.suit == Suit.COINS:
+                        if self.oros_scoring:
+                            team_oros_points[tid] = team_oros_points.get(tid, 0) + card.rank
+                        if self.ace_of_gold_bonus and card.rank == 1:
+                            team_ace_of_gold[tid] = True
+
+            player.captured_cards = []
+
+        unique_tids = set(p.team_id for p in self.players)
+        for tid in unique_tids:
+            count = team_captures.get(tid, 0)
+            # Standard scoring for captured cards > 20
+            if count > 20:
+                points = count - 20
+                self._add_team_score(tid, points)
+
+            # Oros scoring
+            if self.oros_scoring and tid in team_oros_points:
+                self._add_team_score(tid, team_oros_points[tid])
+
+            # Ace of Gold bonus
+            if self.ace_of_gold_bonus and team_ace_of_gold.get(tid):
+                self._add_team_score(tid, 10)
+
         winner = [p for p in self.players if p.score >= self.target_score]
         if winner:
             self.game_over = True
             self.is_over = True
         else:
             self.dealer_index = (self.dealer_index + 1) % len(self.players)
+            self.current_player_index = (self.dealer_index + 1) % len(self.players)
             self.deck = SpanishDeck(include_8_9=False)
             self.last_taker = None
             self.last_card_played = None
             self.match_chain_count = 0
+            self.table = []
+            for player in self.players:
+                player.hand = []
+                player.captured_cards = []
             self.initial_table_setup()
             self.deal_cards()
