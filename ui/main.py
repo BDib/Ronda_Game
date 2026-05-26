@@ -65,6 +65,7 @@ class RondaApp:
         ace_bonus_toggle = ft.Switch(label="Ace of Gold Bonus (+10 pts)", value=False)
         missa_last_toggle = ft.Switch(label="Allow Missa on Last Card", value=False)
         last_cap_toggle = ft.Switch(label="Last Capture Wins Table", value=True)
+        enable_9a3a_toggle = ft.Switch(label="9a3a Rey/As Rules", value=True)
 
         player_count_radio = ft.RadioGroup(content=ft.Row([
             ft.Radio(value="2", label="2 Players (1v1)"),
@@ -89,6 +90,7 @@ class RondaApp:
                 "ace_of_gold_bonus": ace_bonus_toggle.value,
                 "missa_last_card_allowed": missa_last_toggle.value,
                 "last_capture_wins_table": last_cap_toggle.value,
+                "enable_9a3a": enable_9a3a_toggle.value,
                 "difficulty": difficulty_radio.value
             }
 
@@ -133,6 +135,7 @@ class RondaApp:
                                 ft.Row([target_score_dropdown, custom_score_input], alignment=ft.MainAxisAlignment.CENTER),
                                 ft.Row([oros_toggle, ace_bonus_toggle], alignment=ft.MainAxisAlignment.CENTER),
                                 ft.Row([missa_last_toggle, last_cap_toggle], alignment=ft.MainAxisAlignment.CENTER),
+                                ft.Row([enable_9a3a_toggle], alignment=ft.MainAxisAlignment.CENTER),
                             ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
                             padding=20, bgcolor="#1b5e20", border_radius=15
                         ),
@@ -196,7 +199,8 @@ class RondaApp:
                                    oros_scoring=room["game_opts"]["oros_scoring"],
                                    ace_of_gold_bonus=room["game_opts"]["ace_of_gold_bonus"],
                                    missa_last_card_allowed=room["game_opts"]["missa_last_card_allowed"],
-                                   last_capture_wins_table=room["game_opts"]["last_capture_wins_table"])
+                                   last_capture_wins_table=room["game_opts"]["last_capture_wins_table"],
+                                   enable_9a3a=room["game_opts"].get("enable_9a3a", True))
         room["state"] = self.game
         self.broadcast_state()
 
@@ -267,7 +271,8 @@ class RondaApp:
                                                oros_scoring=room["game_opts"]["oros_scoring"],
                                                ace_of_gold_bonus=room["game_opts"]["ace_of_gold_bonus"],
                                                missa_last_card_allowed=room["game_opts"]["missa_last_card_allowed"],
-                                               last_capture_wins_table=room["game_opts"]["last_capture_wins_table"])
+                                               last_capture_wins_table=room["game_opts"]["last_capture_wins_table"],
+                                               enable_9a3a=room["game_opts"].get("enable_9a3a", True))
                     room["state"] = self.game
                     self.broadcast_state()
         elif msg["type"] == "UPDATE":
@@ -395,10 +400,10 @@ class RondaApp:
             alignment=ft.MainAxisAlignment.CENTER, spacing=15, wrap=True
         )
         event_text = []
-        if self.last_events.get("bount"): event_text.append("BOUNT! (+1)")
-        if self.last_events.get("inza"): event_text.append("INZA! (+5)")
-        if self.last_events.get("ghader"): event_text.append("GHADER! (+10)")
-        if self.last_events.get("missa"): event_text.append("MISSA! (+1)")
+        if self.last_events.get("bount"): event_text.append("BWAHAD بواحد (+1)")
+        if self.last_events.get("inza"): event_text.append("BKHAMSA بخمسة (+5)")
+        if self.last_events.get("ghader"): event_text.append("BASHARA بعشرة (+10)")
+        if self.last_events.get("missa"): event_text.append("MAYSA ميسا (+1)")
         ann_events = self.last_events.get("announcements", {})
         for p, ann in ann_events.items():
             pts = 5 if ann == "Tringla" else 1
@@ -420,6 +425,7 @@ class RondaApp:
         if self.game.ace_of_gold_bonus: active_rules.append("Ace of Gold Bonus")
         if self.game.missa_last_card_allowed: active_rules.append("Missa Last Card")
         if not self.game.last_capture_wins_table: active_rules.append("No Last Capture Rule")
+        if self.game.enable_9a3a: active_rules.append("9a3a Rules")
         rules_text = ft.Text(f"Rules: {', '.join(active_rules) if active_rules else 'Standard'} | Target: {self.game.target_score}", size=10, color="white54")
 
         central_area = ft.Container(
@@ -501,4 +507,4 @@ def main(page: ft.Page):
 if __name__ == "__main__":
     # Assets are now located in ui/assets/
     assets_path = os.path.join(os.path.dirname(__file__), "assets")
-    ft.app(target=main, assets_dir=assets_path)
+    ft.run(target=main, assets_dir=assets_path)

@@ -9,11 +9,12 @@ class RondaGameState(GameState):
                  ace_of_gold_bonus: bool = False,
                  allow_missa: bool = True,
                  missa_last_card_allowed: bool = False,
-                 last_capture_wins_table: bool = True):
+                 last_capture_wins_table: bool = True,
+                 enable_9a3a: bool = True):
         super().__init__()
         self.deck = SpanishDeck(include_8_9=False)
         self.players = players
-        self.current_player_index = 1 # Dealer is 0, so player 1 starts
+        self.current_player_index = (self.dealer_index + 1) % len(self.players) if hasattr(self, 'dealer_index') else 1
         self.last_taker: Optional[Player] = None
         self.last_card_played: Optional[Card] = None
         self.match_chain_count: int = 0
@@ -27,6 +28,7 @@ class RondaGameState(GameState):
         self.allow_missa = allow_missa
         self.missa_last_card_allowed = missa_last_card_allowed
         self.last_capture_wins_table = last_capture_wins_table
+        self.enable_9a3a = enable_9a3a
 
         self.game_over = False
         self._assign_teams()
@@ -71,6 +73,9 @@ class RondaGameState(GameState):
 
     def add_score(self, player: Player, points: int):
         target_team = player.team_id
+        if target_team is None:
+            player.score += points
+            return
         for p in self.players:
             if p.team_id == target_team:
                 p.score += points
@@ -214,6 +219,25 @@ class RondaGameState(GameState):
         }
 
     def end_round(self):
+        # 9a3a Rules
+        if self.enable_9a3a and self.last_card_played:
+            dealer = self.players[self.dealer_index]
+            # 9a3a Rey: Dealer ends with 12
+            if self.last_card_played.rank == 12:
+                self.add_score(dealer, 5)
+            # 9a3a As: Dealer ends with 1 (Opponent wins points)
+            elif self.last_card_played.rank == 1:
+                # Give points to opponent team
+                unique_teams = list(set(p.team_id for p in self.players))
+                if len(unique_teams) == 2:
+                    opponent_tid = [t for t in unique_teams if t != dealer.team_id][0]
+                else:
+                    opponent_tid = (dealer.team_id + 1) % len(self.players)
+
+                for p in self.players:
+                    if p.team_id == opponent_tid:
+                        p.score += 5
+
         if self.table and self.last_taker and self.last_capture_wins_table:
             self.last_taker.capture(self.table)
             self.table = []
