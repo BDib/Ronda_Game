@@ -40,6 +40,10 @@ class RondaApp:
 
     def init_ui(self):
         self.page.clean()
+        self.game = None
+        self.room_id = None
+        self.is_multiplayer = False
+        self.my_player_index = 0
 
         # Game Options
         target_score_dropdown = ft.Dropdown(
@@ -154,10 +158,16 @@ class RondaApp:
     def create_multiplayer_room(self, num_players, timer_mins, game_opts):
         self.room_id = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
         self.is_multiplayer = True
+        # Index 1 is often the bottom player (host's perspective)
         self.my_player_index = 1
+
+        # Initialize players list and put the host in it immediately
+        players = [None] * num_players
+        players[self.my_player_index] = Player("Host (You)")
+
         active_rooms[self.room_id] = {
             "num_players": num_players,
-            "players": [None] * num_players,
+            "players": players,
             "state": None,
             "last_events": {},
             "game_opts": game_opts,
@@ -263,7 +273,9 @@ class RondaApp:
         room = active_rooms.get(self.room_id)
         if not room: return
         if msg["type"] == "JOIN":
-            room["players"][msg["index"]] = Player(msg["name"])
+            # Only update if the slot is empty or being taken by a human
+            if room["players"][msg["index"]] is None or not isinstance(room["players"][msg["index"]], RondaAI):
+                room["players"][msg["index"]] = Player(msg["name"])
             if all(p is not None for p in room["players"]):
                 if self.my_player_index == 1: # Host
                     self.game = RondaGameState(room["players"],

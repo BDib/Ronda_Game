@@ -14,14 +14,14 @@ class RondaGameState(GameState):
         super().__init__()
         self.deck = SpanishDeck(include_8_9=False)
         self.players = players
-        self.current_player_index = (self.dealer_index + 1) % len(self.players) if hasattr(self, 'dealer_index') else 1
+        self.dealer_index = 0
+        self.current_player_index = (self.dealer_index + 1) % len(self.players)
         self.last_taker: Optional[Player] = None
         self.last_card_played: Optional[Card] = None
         self.match_chain_count: int = 0
         
         self.announcements = {}
         self.announcement_ranks = {}
-        self.dealer_index = 0
         self.target_score = target_score
         self.oros_scoring = oros_scoring
         self.ace_of_gold_bonus = ace_of_gold_bonus
