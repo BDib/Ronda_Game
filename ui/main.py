@@ -507,4 +507,4 @@ def main(page: ft.Page):
 if __name__ == "__main__":
     # Assets are now located in ui/assets/
     assets_path = os.path.join(os.path.dirname(__file__), "assets")
-    ft.run(target=main, assets_dir=assets_path)
+    ft.app(target=main, assets_dir=assets_path)
