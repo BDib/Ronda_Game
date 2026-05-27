@@ -175,11 +175,17 @@ class RondaApp:
             "start_time": asyncio.get_event_loop().time()
         }
         self.page.pubsub.subscribe_topic(f"room_{self.room_id}", self.on_multiplayer_message)
+        self.page.on_disconnect = self.on_page_disconnect
         self.join_multiplayer_room(self.room_id, is_host=True)
         self.page.run_task(self.lobby_timer_task)
 
+    def on_page_disconnect(self, e):
+        if self.room_id:
+            # Clean up or notify others
+            pass
+
     async def lobby_timer_task(self):
-        while self.room_id in active_rooms and self.game is None:
+        while self.page and self.room_id in active_rooms and self.game is None:
             room = active_rooms[self.room_id]
             elapsed = asyncio.get_event_loop().time() - room["start_time"]
             remaining = max(0, room["timer_seconds"] - elapsed)
@@ -269,7 +275,11 @@ class RondaApp:
         return f"Side (Opponent {index+1})"
 
     def on_multiplayer_message(self, topic, message):
-        msg = json.loads(message)
+        try:
+            msg = json.loads(message)
+        except json.JSONDecodeError:
+            return
+
         room = active_rooms.get(self.room_id)
         if not room: return
         if msg["type"] == "JOIN":
@@ -291,14 +301,15 @@ class RondaApp:
             self.game = room["state"]
             self.last_events = room["last_events"]
             self.render_game_board()
-            if self.my_player_index == 1 and not self.game.current_player.is_human: # Host handles AI
+            if self.my_player_index == 1 and self.game and not self.game.current_player.is_human: # Host handles AI
                 self.page.run_task(self.handle_cpu_move)
         elif msg["type"] == "STATE":
             self.game = room["state"]
-            self.human_player = self.game.players[self.my_player_index]
-            self.render_game_board()
-            if self.my_player_index == 1 and not self.game.current_player.is_human: # Host handles AI
-                self.page.run_task(self.handle_cpu_move)
+            if self.game:
+                self.human_player = self.game.players[self.my_player_index]
+                self.render_game_board()
+                if self.my_player_index == 1 and not self.game.current_player.is_human: # Host handles AI
+                    self.page.run_task(self.handle_cpu_move)
 
     def broadcast_state(self):
         self.page.pubsub.send_all_on_topic(f"room_{self.room_id}", json.dumps({"type": "STATE"}))
@@ -313,10 +324,11 @@ class RondaApp:
             self.my_player_index = 1
         else:
             self.ai_players = [
-                RondaAI("CPU (Partner)", difficulty=difficulty),
-                RondaAI("CPU (Left)", difficulty=difficulty),
-                RondaAI("CPU (Right)", difficulty=difficulty)
+                RondaAI("CPU (Opponent 1)", difficulty=difficulty),
+                RondaAI("CPU (Opponent 2)", difficulty=difficulty),
+                RondaAI("CPU (Partner)", difficulty=difficulty)
             ]
+            # Order: 0:Opp1 (T0), 1:You (T1), 2:Opp2 (T0), 3:Partner (T1)
             players = [self.ai_players[0], self.human_player, self.ai_players[1], self.ai_players[2]]
             self.my_player_index = 1
         self.game = RondaGameState(players, **opts)
@@ -387,15 +399,15 @@ class RondaApp:
 
         player_me = self.game.players[self.my_player_index]
         if len(self.game.players) == 4:
-            # Partners sit opposite each other (0&1, 2&3)
+            # Partners sit opposite each other (0&2, 1&3)
             if self.my_player_index == 0:
-                partner_idx, left_idx, right_idx = 1, 2, 3
+                partner_idx, left_idx, right_idx = 2, 1, 3
             elif self.my_player_index == 1:
-                partner_idx, left_idx, right_idx = 0, 2, 3
+                partner_idx, left_idx, right_idx = 3, 2, 0
             elif self.my_player_index == 2:
-                partner_idx, left_idx, right_idx = 3, 0, 1
+                partner_idx, left_idx, right_idx = 0, 3, 1
             else: # 3
-                partner_idx, left_idx, right_idx = 2, 0, 1
+                partner_idx, left_idx, right_idx = 1, 0, 2
         else:
             partner_idx = 0 if self.my_player_index == 1 else 1
             left_idx, right_idx = None, None
@@ -498,8 +510,10 @@ class RondaApp:
                         self.page.run_task(self.handle_cpu_move)
 
     async def handle_cpu_move(self):
-        if self.game.game_over: return
+        if not self.page or self.game.game_over: return
         await asyncio.sleep(0.8)
+        if not self.page or self.game.game_over: return
+
         current_ai = self.game.current_player
         if not current_ai.is_human and not self.game.game_over:
             move = current_ai.select_move(self.game)
@@ -519,4 +533,6 @@ def main(page: ft.Page):
 if __name__ == "__main__":
     # Assets are now located in ui/assets/
     assets_path = os.path.join(os.path.dirname(__file__), "assets")
+    # Using ft.app for stability in the current environment (Flet 0.85.1)
+    # ft.run() is available but can lead to signature mismatches on some platforms.
     ft.app(target=main, assets_dir=assets_path)
