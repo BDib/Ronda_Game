@@ -324,11 +324,10 @@ class RondaApp:
             self.my_player_index = 1
         else:
             self.ai_players = [
-                RondaAI("CPU (Opponent 1)", difficulty=difficulty),
-                RondaAI("CPU (Opponent 2)", difficulty=difficulty),
-                RondaAI("CPU (Partner)", difficulty=difficulty)
+                RondaAI("CPU (Partner)", difficulty=difficulty),
+                RondaAI("CPU (Left)", difficulty=difficulty),
+                RondaAI("CPU (Right)", difficulty=difficulty)
             ]
-            # Order: 0:Opp1 (T0), 1:You (T1), 2:Opp2 (T0), 3:Partner (T1)
             players = [self.ai_players[0], self.human_player, self.ai_players[1], self.ai_players[2]]
             self.my_player_index = 1
         self.game = RondaGameState(players, **opts)

@@ -37,10 +37,10 @@ class TestRonda(unittest.TestCase):
         self.assertEqual(player.score, 1)
 
     def test_team_scoring_4_players(self):
-        p1 = Player("P1") # Top (Team 0)
-        p2 = Player("P2") # Bottom (Human) (Team 0)
-        p3 = Player("P3") # Left (Team 1)
-        p4 = Player("P4") # Right (Team 1)
+        p1 = Player("P1") # Team 0 (Index 0)
+        p2 = Player("P2") # Team 1 (Index 1)
+        p3 = Player("P3") # Team 0 (Index 2)
+        p4 = Player("P4") # Team 1 (Index 3)
 
         # Ensure hands don't have announcements
         p1.hand = [Card(Suit.COINS, 1), Card(Suit.CUPS, 2), Card(Suit.SWORDS, 3)]
@@ -58,29 +58,29 @@ class TestRonda(unittest.TestCase):
 
         for p in game.players: p.score = 0
 
-        # Teams: Team 0: [P1, P2], Team 1: [P3, P4]
+        # Teams: Team 0: [P1, P3], Team 1: [P2, P4]
         self.assertEqual(p1.team_id, 0)
-        self.assertEqual(p2.team_id, 0)
-        self.assertEqual(p3.team_id, 1)
+        self.assertEqual(p2.team_id, 1)
+        self.assertEqual(p3.team_id, 0)
         self.assertEqual(p4.team_id, 1)
 
-        # Force a Bount for P2 (Team 0)
+        # Force a Bount for P1 (Team 0)
         game.last_card_played = Card(Suit.COINS, 7)
-        game.current_player_index = 1 # P2's turn
-        p2.hand = [Card(Suit.CUPS, 7)]
-        game.play_move(p2, p2.hand[0])
+        game.current_player_index = 0 # P1's turn
+        p1.hand = [Card(Suit.CUPS, 7)]
+        game.play_move(p1, p1.hand[0])
 
         self.assertEqual(p1.score, 1)
-        self.assertEqual(p2.score, 1)
-        self.assertEqual(p3.score, 0)
+        self.assertEqual(p3.score, 1)
+        self.assertEqual(p2.score, 0)
 
         RondaGameState.resolve_announcements = original_resolve
 
     def test_end_round_card_counting_teams(self):
-        p1 = Player("P1")
-        p2 = Player("P2")
-        p3 = Player("P3")
-        p4 = Player("P4")
+        p1 = Player("P1") # T0
+        p2 = Player("P2") # T1
+        p3 = Player("P3") # T0
+        p4 = Player("P4") # T1
 
         # Override resolve_announcements to do nothing
         original_resolve = RondaGameState.resolve_announcements
@@ -95,18 +95,18 @@ class TestRonda(unittest.TestCase):
         game.last_taker = None
         game.table = []
 
-        # Team 0: P1 + P2 = 25 cards -> Expected 5 points each
+        # Team 0 (P1 + P3): 25 cards -> Expected 5 points each
         p1.captured_cards = [Card(Suit.COINS, 1)] * 15
-        p2.captured_cards = [Card(Suit.COINS, 1)] * 10
-        # Team 1: P3 + P4 = 15 cards -> Expected 0 points each
-        p3.captured_cards = [Card(Suit.COINS, 1)] * 5
+        p3.captured_cards = [Card(Suit.COINS, 1)] * 10
+        # Team 1 (P2 + P4): 15 cards -> Expected 0 points each
+        p2.captured_cards = [Card(Suit.COINS, 1)] * 5
         p4.captured_cards = [Card(Suit.COINS, 1)] * 10
 
         game.end_round()
 
         self.assertEqual(p1.score, 5)
-        self.assertEqual(p2.score, 5)
-        self.assertEqual(p3.score, 0)
+        self.assertEqual(p3.score, 5)
+        self.assertEqual(p2.score, 0)
         self.assertEqual(p4.score, 0)
 
         RondaGameState.resolve_announcements = original_resolve
